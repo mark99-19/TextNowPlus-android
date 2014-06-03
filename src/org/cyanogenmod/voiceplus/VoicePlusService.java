@@ -434,8 +434,8 @@ public class VoicePlusService extends Service {
         else
             uri = URI_SENT;
 
-        Cursor c = getContentResolver().query(uri, null, "date = ?",
-                    new String[] { String.valueOf(date) }, null);
+        Cursor c = getContentResolver().query(uri, null, "date = ? or date_sent = ?",
+                    new String[] { String.valueOf(date), String.valueOf(date) }, null);
         try {
             if (c.moveToNext())
                 return;
