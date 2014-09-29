@@ -17,9 +17,7 @@
 -->
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
   <string name="enable_voice_plus">Aktifkan Voice+ oleh CyanogenMod</string>
-  <string name="info">Voice+ memungkinkan semua aplikasi untuk mengirim pesan SMS melalui Google Voice</string>
   <string name="select_account">Pilih akun</string>
   <string name="disable">Nonaktifkan</string>
-  <string name="account">Akun</string>
   <string name="not_granted">Izin tidak tersedia:\n%s</string>
 </resources>

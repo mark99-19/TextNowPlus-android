@@ -17,9 +17,7 @@
 -->
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
   <string name="enable_voice_plus">CyanogenModのVoice+をアクティベート</string>
-  <string name="info">Voice+はすべてのアプリでGoogleボイスを通じたSMSメッセージの送信を有効にします</string>
   <string name="select_account">アカウントを選択</string>
   <string name="disable">無効</string>
-  <string name="account">アカウント</string>
   <string name="not_granted">権限が利用できません:\n%s</string>
 </resources>

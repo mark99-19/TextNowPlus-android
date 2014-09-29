@@ -17,9 +17,7 @@
 -->
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
   <string name="enable_voice_plus">کارپێکردنی ده‌نگ+ له‌لایه‌ن ساینه‌جینمۆد</string>
-  <string name="info">ده‌نگ+ کارپێکردنی هه‌موو به‌رنامه‌کان بۆ ناردنی نامه‌ی SMS بۆ Google ده‌نگ</string>
   <string name="select_account">دیاری کردنی هه‌ژمار</string>
   <string name="disable">له‌کارخستن</string>
-  <string name="account">هه‌ژمار</string>
   <string name="not_granted">کاره‌که‌ ئاماده‌نییه‌:\n%s</string>
 </resources>

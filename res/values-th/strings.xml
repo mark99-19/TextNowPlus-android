@@ -17,9 +17,7 @@
 -->
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
   <string name="enable_voice_plus">เปิดใช้งาน Voice+ โดย CyanogenMod</string>
-  <string name="info">Voice+ เปิดใช้งานสำหรับทุกแอปที่ส่ง SMS ผ่าน Google Voice</string>
   <string name="select_account">เลือกบัญชี</string>
   <string name="disable">ปิด</string>
-  <string name="account">บัญชี</string>
   <string name="not_granted">ไม่สามารถขอใช้งานสิทธิได้ :\n%s</string>
 </resources>

@@ -17,9 +17,7 @@
 -->
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
   <string name="enable_voice_plus">CyanogenMod-en Voice+ gaitu</string>
-  <string name="info">Voice+ -ek SMS-ak Google Voice-n bidez bidaltzea baimentzen du</string>
   <string name="select_account">Kontua hautatu</string>
   <string name="disable">Ezgaituta</string>
-  <string name="account">Kontua</string>
   <string name="not_granted">\u00AB%s\u00BB baimena ez dago eskuragarri</string>
 </resources>

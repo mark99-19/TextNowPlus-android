@@ -17,9 +17,7 @@
 -->
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
   <string name="enable_voice_plus">Activați Voce+ de la CyanogenMod</string>
-  <string name="info">Voce+ permite tuturor aplicațiilor să trimită mesaje SMS prin Voce Google</string>
   <string name="select_account">Selectați contul</string>
   <string name="disable">Dezactivare</string>
-  <string name="account">Cont</string>
   <string name="not_granted">Permisiune indisponibilă:\n%s</string>
 </resources>
