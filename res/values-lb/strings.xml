@@ -16,5 +16,8 @@
      limitations under the License.
 -->
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+  <string name="enable_voice_plus">Voice+ vu CyanogenMod aktivéieren</string>
+  <string name="select_account">Kont wielen</string>
   <string name="disable">Desaktivéieren</string>
+  <string name="not_granted">Berechtegung feelt:\n%s</string>
 </resources>
