@@ -156,13 +156,14 @@ public class VoicePlusService extends Service {
 
         TelephonyManager tm = (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE);
         String country = tm.getNetworkCountryIso();
-        if (country == null)
+        if (country.isEmpty())
             country = tm.getSimCountryIso();
-        if (country == null)
+        if (country.isEmpty())
             return address.startsWith("+1"); /* Should never be reached. */
 
-        if (!country.toUpperCase().equals("US") && !address.startsWith("+1"))
+        if (!country.toUpperCase().matches("US|CA") && !address.startsWith("+1"))
             return false;
+
 
         return true;
     }
