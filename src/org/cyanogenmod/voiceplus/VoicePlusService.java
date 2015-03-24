@@ -42,6 +42,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.concurrent.ExecutionException;
@@ -158,6 +159,8 @@ public class VoicePlusService extends Service {
         String country = tm.getNetworkCountryIso();
         if (country.isEmpty())
             country = tm.getSimCountryIso();
+        if (country.isEmpty())
+            country = Locale.getDefault().getCountry();
         if (country.isEmpty())
             return address.startsWith("+1"); /* Should never be reached. */
 
