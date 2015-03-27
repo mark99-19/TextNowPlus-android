@@ -9,7 +9,7 @@ import android.os.PowerManager;
  * Created by koush on 6/23/13.
  */
 public class Helper {
-    public static final String GOOGLE_VOICE_PACKAGE = "com.google.android.apps.googlevoice";
+    public static final String GOOGLE_VOICE_PACKAGE = "com.enflick.android.TextNow";
 
     static PowerManager.WakeLock wakeLock;
     static WifiManager.WifiLock wifiLock;

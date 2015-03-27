@@ -21,6 +21,7 @@ import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.TextView;
 
+// TODO: phase 2
 public class VoicePlusSetup extends Activity {
     class AccountAdapter extends ArrayAdapter<Account> {
         AccountAdapter() {
@@ -78,7 +79,7 @@ public class VoicePlusSetup extends Activity {
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
                 Account account = accountAdapter.getItem(position);
 
-                final String previousAccount = settings.getString("account", null);
+                final String previousAccount = settings.getString("client_id", null);
                 new Thread() {
                     @Override
                     public void run() {
@@ -97,7 +98,7 @@ public class VoicePlusSetup extends Activity {
             }
         });
 
-        String selectedAccount = settings.getString("account", null);
+        String selectedAccount = settings.getString("client_id", null);
 
         NULL = new Account(getString(R.string.disable), "com.google");
         accountAdapter.add(NULL);
@@ -115,48 +116,12 @@ public class VoicePlusSetup extends Activity {
     }
 
     void invalidateToken(String account) {
-        if (account == null)
-            return;
-
-        try {
-            // grab the auth token
-            Bundle bundle = AccountManager.get(this).getAuthToken(new Account(account, "com.google"), "grandcentral", true, null, null).getResult();
-            String authToken = bundle.getString(AccountManager.KEY_AUTHTOKEN);
-            AccountManager.get(this).invalidateAuthToken("com.google", authToken);
-            Log.i(LOGTAG, "Token invalidated.");
-        }
-        catch (Exception e) {
-            Log.e(LOGTAG, "error invalidating token", e);
-        }
+        Log.e(LOGTAG, "invalidateToken() called.");
     }
 
     private static final String LOGTAG = "VoicePlusSetup";
 
     void getToken(final Account account, final int position) {
-        AccountManager am = AccountManager.get(this);
-        if (am == null)
-            return;
-        am.getAuthToken(account, "grandcentral", null, this, new AccountManagerCallback<Bundle>() {
-            @Override
-            public void run(AccountManagerFuture<Bundle> future) {
-                try {
-                    Bundle bundle = future.getResult();
-                    final String authToken = bundle.getString(AccountManager.KEY_AUTHTOKEN);
-                    settings.edit()
-                    .putString("account", account.name)
-                    .commit();
-                    Intent intent = new Intent(VoicePlusSetup.this, VoicePlusService.class);
-                    intent.setAction(VoicePlusService.ACCOUNT_CHANGED);
-                    startService(intent);
-
-                    lv.setItemChecked(position, true);
-                    lv.requestLayout();
-                    Log.i(LOGTAG, "Token retrieved.");
-                }
-                catch (Exception ex) {
-                    ex.printStackTrace();
-                }
-            }
-        }, new Handler());
+        Log.e(LOGTAG, "getToken() called.");
     }
 }

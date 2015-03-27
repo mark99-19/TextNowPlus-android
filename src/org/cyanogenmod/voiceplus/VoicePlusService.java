@@ -28,6 +28,8 @@ import android.text.TextUtils;
 import android.util.Log;
 
 import com.android.internal.telephony.ISms;
+import com.google.common.base.Joiner;
+import com.google.common.base.Joiner.MapJoiner;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.annotations.SerializedName;
@@ -38,24 +40,32 @@ import com.koushikdutta.ion.Response;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.concurrent.ExecutionException;
 
+import org.apache.commons.codec.binary.Hex;
+import org.apache.commons.codec.digest.DigestUtils;
+
 /**
  * Created by koush on 7/5/13.
  */
 public class VoicePlusService extends Service {
-    public static final String ACTION_INCOMING_VOICE = VoicePlusService.class.getPackage().getName() + ".INCOMING_VOICE";
+    public static final String ACTION_INCOMING_API_SMS = VoicePlusService.class.getPackage().getName() + ".INCOMING_API_SMS";
     private static final String LOGTAG = "VoicePlusSetup";
 
     private ISms smsTransport;
     private SharedPreferences settings;
+    private String hardcodedKey = "f8ab2ceca9163724b6d126aea9620339";
+    private String baseUrl = "https://api.textnow.me/api2.0/";
+    private String username = settings.getString("username", "patcon_");
 
     @Override
     public IBinder onBind(Intent intent) {
@@ -171,11 +181,32 @@ public class VoicePlusService extends Service {
         return true;
     }
 
+    String getMd5Signature(String requestType, String endpoint, String queryString, String bodyJsonString) {
+        String catString = hardcodedKey + requestType + endpoint + queryString + bodyJsonString;
+        String hash = new String(Hex.encodeHex(DigestUtils.md5(catString)));
+
+        return hash;
+    }
+
+    String getQueryString(Map<String, List<String>> queryParams) {
+      // Convert single-item List to String for MapJoiner
+      Map<String,String> queryParamsRemap = new HashMap<String,String>();
+      for (Map.Entry<String, List<String>> entry : queryParams.entrySet()) {
+        try {
+          queryParamsRemap.put(entry.getKey(), (String) entry.getValue().get(0));
+        } catch (ClassCastException cce) {
+        }
+      }
+      Joiner.MapJoiner joiner = Joiner.on("&").withKeyValueSeparator("=");
+      String queryString = joiner.join(queryParamsRemap);
+      return "?" + queryString;
+    }
+
     @Override
     public int onStartCommand(final Intent intent, int flags, int startId) {
         int ret = super.onStartCommand(intent, flags, startId);
 
-        if (null == settings.getString("account", null)) {
+        if (null == settings.getString("client_id", null)) {
             stopSelf();
             return ret;
         }
@@ -203,28 +234,14 @@ public class VoicePlusService extends Service {
                 }
             }.start();
         }
-        else if (ACTION_INCOMING_VOICE.equals(intent.getAction())) {
-            if (null == settings.getString("account", null))
+        else if (ACTION_INCOMING_API_SMS.equals(intent.getAction())) {
+            if (null == settings.getString("client_id", null))
                 return ret;
             startRefresh();
-        }
-        else if (ACCOUNT_CHANGED.equals(intent.getAction())) {
-            new Thread() {
-                @Override
-                public void run() {
-                    try {
-                        fetchRnrSe(getAuthToken(settings.getString("account", null)));
-                    }
-                    catch (Exception e) {
-                    }
-                }
-            }.start();
         }
 
         return ret;
     }
-
-    public static final String ACCOUNT_CHANGED = VoicePlusService.class.getPackage().getName() + ".ACCOUNT_CHANGED";
 
     // mark all sent intents as failures
     public void fail(List<PendingIntent> sentIntents) {
@@ -256,48 +273,6 @@ public class VoicePlusService extends Service {
         }
     }
 
-    // fetch the weirdo opaque token google voice needs...
-    void fetchRnrSe(String authToken) throws ExecutionException, InterruptedException {
-        JsonObject userInfo = Ion.with(this)
-        .load("https://www.google.com/voice/request/user")
-        .setHeader("Authorization", "GoogleLogin auth=" + authToken)
-        .asJsonObject()
-        .get();
-
-        String rnrse = userInfo.get("r").getAsString();
-
-        try {
-            TelephonyManager tm = (TelephonyManager)getSystemService(TELEPHONY_SERVICE);
-            String number = tm.getLine1Number();
-            if (number != null) {
-                JsonObject phones = userInfo.getAsJsonObject("phones");
-                for (Map.Entry<String, JsonElement> entry: phones.entrySet()) {
-                    JsonObject phone = entry.getValue().getAsJsonObject();
-                    if (!PhoneNumberUtils.compare(number, phone.get("phoneNumber").getAsString()))
-                        continue;
-                    if (!phone.get("smsEnabled").getAsBoolean())
-                        break;
-                    Log.i(LOGTAG, "Disabling SMS forwarding to phone.");
-                    Ion.with(this)
-                    .load("https://www.google.com/voice/settings/editForwardingSms/")
-                    .setHeader("Authorization", "GoogleLogin auth=" + authToken)
-                    .setBodyParameter("phoneId", entry.getKey())
-                    .setBodyParameter("enabled", "0")
-                    .setBodyParameter("_rnr_se", rnrse)
-                    .asJsonObject();
-                    break;
-                }
-            }
-        }
-        catch (Exception e) {
-            Log.e(LOGTAG, "Error verifying GV SMS forwarding", e);
-        }
-
-        settings.edit()
-        .putString("_rnr_se", rnrse)
-        .commit();
-    }
-
     // mark an outgoing text as recently sent, so if it comes in via
     // round trip, we ignore it.
     PriorityQueue<String> recentSent = new PriorityQueue<String>();
@@ -307,32 +282,9 @@ public class VoicePlusService extends Service {
         recentSent.add(text);
     }
 
-    public String getAuthToken(String account) throws IOException, OperationCanceledException, AuthenticatorException {
-        Bundle bundle = AccountManager.get(this).getAuthToken(new Account(account, "com.google"), "grandcentral", true, null, null).getResult();
-        return bundle.getString(AccountManager.KEY_AUTHTOKEN);
-    }
-
     // send an outgoing sms event via google voice
     public void onSendMultipartText(String destAddr, String scAddr, List<String> texts, final List<PendingIntent> sentIntents, final List<PendingIntent> deliveryIntents, boolean multipart) {
-        // grab the account and wacko opaque routing token thing
-        String rnrse = settings.getString("_rnr_se", null);
-        String account = settings.getString("account", null);
-        String authToken;
-
-        try {
-            // grab the auth token
-            authToken = getAuthToken(account);
-
-            if (rnrse == null) {
-                fetchRnrSe(authToken);
-                rnrse = settings.getString("_rnr_se", null);
-            }
-        }
-        catch (Exception e) {
-            Log.e(LOGTAG, "Error fetching tokens", e);
-            fail(sentIntents);
-            return;
-        }
+        String clientId = settings.getString("client_id", null);
 
         // combine the multipart text into one string
         StringBuilder textBuilder = new StringBuilder();
@@ -344,20 +296,7 @@ public class VoicePlusService extends Service {
         try {
             // send it off, and note that we recently sent this message
             // for round trip tracking
-            sendRnrSe(authToken, rnrse, destAddr, text);
-            addRecent(text);
-            success(sentIntents);
-            return;
-        }
-        catch (Exception e) {
-            Log.d(LOGTAG, "send error", e);
-        }
-
-        try {
-            // on failure, fetch info and try again
-            fetchRnrSe(authToken);
-            rnrse = settings.getString("_rnr_se", null);
-            sendRnrSe(authToken, rnrse, destAddr, text);
+            sendApiSms(clientId, destAddr, text);
             addRecent(text);
             success(sentIntents);
         }
@@ -368,23 +307,23 @@ public class VoicePlusService extends Service {
     }
 
     // hit the google voice api to send a text
-    void sendRnrSe(final String authToken, String rnrse, String number, String text) throws Exception {
+    void sendApiSms(final String clientId, String destAddr, String text) throws Exception {
+        String requestType = "POST";
+        String endpoint = "users/" + username + "/messages";
+
+        JsonObject bodyJson = new JsonObject();
+        bodyJson.addProperty("contact_value", destAddr);
+        bodyJson.addProperty("message", text);
+
+        Map<String, List<String>> defaultQueryParams = new HashMap<String, List<String>>();
+        defaultQueryParams.put("client_id", Arrays.asList(clientId));
+        defaultQueryParams.put("client_type", Arrays.asList("TN_ANDROID"));
+
         JsonObject json = Ion.with(this)
-        .load("https://www.google.com/voice/sms/send/")
-        .onHeaders(new HeadersCallback() {
-            @Override
-            public void onHeaders(RawHeaders headers) {
-                if (headers.getResponseCode() == 401) {
-                    AccountManager.get(VoicePlusService.this).invalidateAuthToken("com.google", authToken);
-                    settings.edit().remove("_rnr_se").commit();
-                }
-            }
-        })
-        .setHeader("Authorization", "GoogleLogin auth=" + authToken)
-        .setBodyParameter("phoneNumber", number)
-        .setBodyParameter("sendErrorSms", "0")
-        .setBodyParameter("text", text)
-        .setBodyParameter("_rnr_se", rnrse)
+        .load(baseUrl + endpoint)
+        .setJsonObjectBody(bodyJson)
+        .addQueries(defaultQueryParams)
+        .addQuery("signature", getMd5Signature(requestType, endpoint, getQueryString(defaultQueryParams), bodyJson.toString()))
         .asJsonObject()
         .get();
 
@@ -403,23 +342,23 @@ public class VoicePlusService extends Service {
     }
 
     public static class Message {
-        @SerializedName("startTime")
+        @SerializedName("date")
         public long date;
 
-        @SerializedName("phoneNumber")
+        @SerializedName("contact_value")
         public String phoneNumber;
 
         @SerializedName("message")
         public String message;
 
-        // 10 is incoming
-        // 11 is outgoing
-        @SerializedName("type")
+        // 1 is incoming
+        // 2 is outgoing
+        @SerializedName("message_direction")
         int type;
     }
 
-    private static final int VOICE_INCOMING_SMS = 10;
-    private static final int VOICE_OUTGOING_SMS = 11;
+    private static final int VOICE_INCOMING_SMS = 1;
+    private static final int VOICE_OUTGOING_SMS = 2;
 
     private static final int PROVIDER_INCOMING_SMS = 1;
     private static final int PROVIDER_OUTGOING_SMS = 2;
@@ -481,32 +420,36 @@ public class VoicePlusService extends Service {
 
     // refresh the messages that were on the server
     void refreshMessages() throws Exception {
-        String account = settings.getString("account", null);
-        if (account == null)
+        String clientId = settings.getString("client_id", null);
+        if (clientId == null)
             return;
 
         Log.i(LOGTAG, "Refreshing messages");
 
-        // tokens!
-        final String authToken = getAuthToken(account);
+        String requestType = "POST";
+        String endpoint = "users/" + username + "/messages";
+
+        Map<String, List<String>> defaultQueryParams = new HashMap<String, List<String>>();
+        defaultQueryParams.put("client_id", Arrays.asList(clientId));
+        defaultQueryParams.put("client_type", Arrays.asList("TN_ANDROID"));
+
+        Map<String, List<String>> extraQueryParams = new HashMap<String, List<String>>();
+        // TODO: Add extra query params
+
+        Map<String, List<String>> queryParams = new HashMap<String, List<String>>();
+        queryParams.putAll(defaultQueryParams);
+        queryParams.putAll(extraQueryParams);
 
         AppOpsManager appOps = (AppOpsManager)getSystemService(APP_OPS_SERVICE);
         appOps.setMode(AppOpsManager.OP_WRITE_SMS, getApplicationInfo().uid,
             getPackageName(), AppOpsManager.MODE_ALLOWED);
 
+        JsonObject bodyJson = new JsonObject();
+
         Payload payload = Ion.with(this)
-        .load("https://www.google.com/voice/request/messages")
-        .onHeaders(new HeadersCallback() {
-            @Override
-            public void onHeaders(RawHeaders headers) {
-                if (headers.getResponseCode() == 401) {
-                    Log.e(LOGTAG, "Refresh failed:\n" + headers.toHeaderString());
-                    AccountManager.get(VoicePlusService.this).invalidateAuthToken("com.google", authToken);
-                    settings.edit().remove("_rnr_se").commit();
-                }
-            }
-        })
-        .setHeader("Authorization", "GoogleLogin auth=" + authToken)
+        .load(baseUrl + endpoint)
+        .addQueries(queryParams)
+        .addQuery("signature", getMd5Signature(requestType, endpoint, getQueryString(queryParams), bodyJson.toString()))
         .as(Payload.class)
         .get();
 

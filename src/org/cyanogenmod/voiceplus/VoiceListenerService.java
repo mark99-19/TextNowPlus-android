@@ -16,10 +16,10 @@ public class VoiceListenerService extends NotificationListenerService {
             return;
         if (settings == null)
             settings = getSharedPreferences("settings", MODE_PRIVATE);
-        if (null == settings.getString("account", null))
+        if (null == settings.getString("client_id", null))
             return;
         cancelNotification(Helper.GOOGLE_VOICE_PACKAGE, sbn.getTag(), sbn.getId());
-        startService(new Intent(this, VoicePlusService.class).setAction(VoicePlusService.ACTION_INCOMING_VOICE));
+        startService(new Intent(this, VoicePlusService.class).setAction(VoicePlusService.ACTION_INCOMING_API_SMS));
     }
 
     @Override
