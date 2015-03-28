@@ -28,8 +28,6 @@ import android.text.TextUtils;
 import android.util.Log;
 
 import com.android.internal.telephony.ISms;
-import com.google.common.base.Joiner;
-import com.google.common.base.Joiner.MapJoiner;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.annotations.SerializedName;
@@ -40,6 +38,8 @@ import com.koushikdutta.ion.Response;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.text.ParsePosition;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
@@ -47,6 +47,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -55,7 +56,10 @@ import java.util.TimeZone;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.commons.codec.binary.Hex;
-import org.apache.commons.codec.digest.DigestUtils;
+
+import org.apache.http.NameValuePair;
+import org.apache.http.client.utils.URLEncodedUtils;
+import org.apache.http.message.BasicNameValuePair;
 
 /**
  * Created by koush on 7/5/13.
@@ -68,7 +72,7 @@ public class VoicePlusService extends Service {
     private SharedPreferences settings;
     private String hardcodedKey = "f8ab2ceca9163724b6d126aea9620339";
     private String baseUrl = "https://api.textnow.me/api2.0/";
-    private String username = settings.getString("username", "patcon_");
+    private String username = "patcon_";
 
     @Override
     public IBinder onBind(Intent intent) {
@@ -186,22 +190,46 @@ public class VoicePlusService extends Service {
 
     String getMd5Signature(String requestType, String endpoint, String queryString, String bodyJsonString) {
         String catString = hardcodedKey + requestType + endpoint + queryString + bodyJsonString;
-        String hash = new String(Hex.encodeHex(DigestUtils.md5(catString)));
+        String hash = md5(catString);
 
         return hash;
     }
 
+    // See: http://stackoverflow.com/a/4846511
+    public static final String md5(final String s) {
+        try {
+            // Create MD5 Hash
+            MessageDigest digest = java.security.MessageDigest
+                    .getInstance("MD5");
+            digest.update(s.getBytes());
+            byte messageDigest[] = digest.digest();
+
+            // Create Hex String
+            StringBuffer hexString = new StringBuffer();
+            for (int i = 0; i < messageDigest.length; i++) {
+                String h = Integer.toHexString(0xFF & messageDigest[i]);
+                while (h.length() < 2)
+                    h = "0" + h;
+                hexString.append(h);
+            }
+            return hexString.toString();
+
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        }
+        return "";
+    }
+
     String getQueryString(Map<String, List<String>> queryParams) {
-      // Convert single-item List to String for MapJoiner
-      Map<String,String> queryParamsRemap = new HashMap<String,String>();
+      // Convert from complex Map to List of NameValuePair's
+      List<NameValuePair> queryParamsRemap = new LinkedList<NameValuePair>();
       for (Map.Entry<String, List<String>> entry : queryParams.entrySet()) {
         try {
-          queryParamsRemap.put(entry.getKey(), (String) entry.getValue().get(0));
+          queryParamsRemap.add(new BasicNameValuePair(entry.getKey(), (String) entry.getValue().get(0)));
         } catch (ClassCastException cce) {
         }
       }
-      Joiner.MapJoiner joiner = Joiner.on("&").withKeyValueSeparator("=");
-      String queryString = joiner.join(queryParamsRemap);
+      String queryString = URLEncodedUtils.format(queryParamsRemap, "utf-8");
       return "?" + queryString;
     }
 
@@ -332,11 +360,13 @@ public class VoicePlusService extends Service {
         defaultQueryParams.put("client_id", Arrays.asList(clientId));
         defaultQueryParams.put("client_type", Arrays.asList("TN_ANDROID"));
 
+        String signature = getMd5Signature(requestType, endpoint, getQueryString(defaultQueryParams), bodyJson.toString());
+
         JsonObject json = Ion.with(this)
         .load(baseUrl + endpoint)
-        .setJsonObjectBody(bodyJson)
         .addQueries(defaultQueryParams)
-        .addQuery("signature", getMd5Signature(requestType, endpoint, getQueryString(defaultQueryParams), bodyJson.toString()))
+        .addQuery("signature", signature)
+        .setJsonObjectBody(bodyJson)
         .asJsonObject()
         .get();
 
@@ -351,6 +381,8 @@ public class VoicePlusService extends Service {
 
     public static class Message {
         @SerializedName("date")
+        public String isoDate;
+
         public long date;
 
         @SerializedName("contact_value")
@@ -462,8 +494,10 @@ public class VoicePlusService extends Service {
         .get();
 
         ArrayList<Message> all = new ArrayList<Message>();
-        for (Message message: payload.messages)
+        for (Message message: payload.messages) {
+            message.date = convertIsoToTimestamp(message.isoDate);
             all.add(message);
+        }
 
         // sort by date order so the events get added in the same order
         Collections.sort(all, new Comparator<Message>() {
@@ -504,7 +538,7 @@ public class VoicePlusService extends Service {
                 else
                     continue;
                 // just populate the content provider and go
-                insertMessage(message.phoneNumber, message.message, type, convertIsoToTimestamp(message.date));
+                insertMessage(message.phoneNumber, message.message, type, message.date);
                 continue;
             }
 
