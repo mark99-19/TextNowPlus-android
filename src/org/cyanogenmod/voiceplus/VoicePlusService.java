@@ -222,10 +222,10 @@ public class VoicePlusService extends Service {
 
     String getQueryString(Map<String, List<String>> queryParams) {
       // Convert from complex Map to List of NameValuePair's
-      List<NameValuePair> queryParamsRemap = new LinkedList<NameValuePair>();
+      LinkedList<NameValuePair> queryParamsRemap = new LinkedList<NameValuePair>();
       for (Map.Entry<String, List<String>> entry : queryParams.entrySet()) {
         try {
-          queryParamsRemap.add(new BasicNameValuePair(entry.getKey(), (String) entry.getValue().get(0)));
+          queryParamsRemap.addFirst(new BasicNameValuePair(entry.getKey(), (String) entry.getValue().get(0)));
         } catch (ClassCastException cce) {
         }
       }
@@ -364,10 +364,9 @@ public class VoicePlusService extends Service {
 
         JsonObject json = Ion.with(this)
         .load(requestType, baseUrl + endpoint)
-        .setLogging("VoicePlus", Log.DEBUG)
+        .setLogging(, Log.DEBUG)
         .addQuery("signature", signature)
-        .addQuery("client_id", clientId)
-        .addQuery("client_type", "TN_ANDROID")
+        .addQueries(defaultQueryParams)
         .setJsonObjectBody(bodyJson)
         .asJsonObject()
         .get();
@@ -491,6 +490,7 @@ public class VoicePlusService extends Service {
 
         Payload payload = Ion.with(this)
         .load(requestType, baseUrl + endpoint)
+        .setLogging(, Log.DEBUG)
         .addQueries(queryParams)
         .addQuery("signature", getMd5Signature(requestType, endpoint, getQueryString(queryParams), bodyJson.toString()))
         .as(Payload.class)
