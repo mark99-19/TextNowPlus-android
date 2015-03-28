@@ -364,7 +364,7 @@ public class VoicePlusService extends Service {
 
         JsonObject json = Ion.with(this)
         .load(requestType, baseUrl + endpoint)
-        .setLogging(, Log.DEBUG)
+        .setLogging(LOGTAG, Log.DEBUG)
         .addQuery("signature", signature)
         .addQueries(defaultQueryParams)
         .setJsonObjectBody(bodyJson)
@@ -490,7 +490,7 @@ public class VoicePlusService extends Service {
 
         Payload payload = Ion.with(this)
         .load(requestType, baseUrl + endpoint)
-        .setLogging(, Log.DEBUG)
+        .setLogging(LOGTAG, Log.DEBUG)
         .addQueries(queryParams)
         .addQuery("signature", getMd5Signature(requestType, endpoint, getQueryString(queryParams), bodyJson.toString()))
         .as(Payload.class)
