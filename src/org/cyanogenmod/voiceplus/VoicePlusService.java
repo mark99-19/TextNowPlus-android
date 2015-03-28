@@ -40,6 +40,8 @@ import com.koushikdutta.ion.Response;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
+import java.text.ParsePosition;
+import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -49,6 +51,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.PriorityQueue;
+import java.util.TimeZone;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.commons.codec.binary.Hex;
@@ -202,6 +205,16 @@ public class VoicePlusService extends Service {
       return "?" + queryString;
     }
 
+    long convertIsoToTimestamp(String isoDate) {
+      String format = "yyyy-MM-dd'T'HH:mm:ss'Z'";
+      SimpleDateFormat sdf = new SimpleDateFormat(format);
+      sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+      ParsePosition pos = new ParsePosition(0);
+      long timestamp = sdf.parse(isoDate, pos).getTime()/1000;
+
+      return timestamp;
+    }
+
     @Override
     public int onStartCommand(final Intent intent, int flags, int startId) {
         int ret = super.onStartCommand(intent, flags, startId);
@@ -332,12 +345,7 @@ public class VoicePlusService extends Service {
     }
 
     public static class Payload {
-        @SerializedName("messageList")
-        public ArrayList<Conversation> conversations = new ArrayList<Conversation>();
-    }
-
-    public static class Conversation {
-        @SerializedName("children")
+        @SerializedName("messages")
         public ArrayList<Message> messages = new ArrayList<Message>();
     }
 
@@ -357,8 +365,8 @@ public class VoicePlusService extends Service {
         int type;
     }
 
-    private static final int VOICE_INCOMING_SMS = 1;
-    private static final int VOICE_OUTGOING_SMS = 2;
+    private static final int API_INCOMING_SMS = 1;
+    private static final int API_OUTGOING_SMS = 2;
 
     private static final int PROVIDER_INCOMING_SMS = 1;
     private static final int PROVIDER_OUTGOING_SMS = 2;
@@ -426,7 +434,7 @@ public class VoicePlusService extends Service {
 
         Log.i(LOGTAG, "Refreshing messages");
 
-        String requestType = "POST";
+        String requestType = "GET";
         String endpoint = "users/" + username + "/messages";
 
         Map<String, List<String>> defaultQueryParams = new HashMap<String, List<String>>();
@@ -454,10 +462,8 @@ public class VoicePlusService extends Service {
         .get();
 
         ArrayList<Message> all = new ArrayList<Message>();
-        for (Conversation conversation: payload.conversations) {
-            for (Message message: conversation.messages)
-                all.add(message);
-        }
+        for (Message message: payload.messages)
+            all.add(message);
 
         // sort by date order so the events get added in the same order
         Collections.sort(all, new Comparator<Message>() {
@@ -491,19 +497,19 @@ public class VoicePlusService extends Service {
             // don't send any broadcasts.
             if (first) {
                 int type;
-                if (message.type == VOICE_INCOMING_SMS)
+                if (message.type == API_INCOMING_SMS)
                     type = PROVIDER_INCOMING_SMS;
-                else if (message.type == VOICE_OUTGOING_SMS)
+                else if (message.type == API_OUTGOING_SMS)
                     type = PROVIDER_OUTGOING_SMS;
                 else
                     continue;
                 // just populate the content provider and go
-                insertMessage(message.phoneNumber, message.message, type, message.date);
+                insertMessage(message.phoneNumber, message.message, type, convertIsoToTimestamp(message.date));
                 continue;
             }
 
             // sync up outgoing messages
-            if (message.type == VOICE_OUTGOING_SMS) {
+            if (message.type == API_OUTGOING_SMS) {
                 boolean found = false;
                 for (String recent: recentSent) {
                     if (TextUtils.equals(recent, message.message)) {
@@ -517,7 +523,7 @@ public class VoicePlusService extends Service {
                 continue;
             }
 
-            if (message.type != VOICE_INCOMING_SMS)
+            if (message.type != API_INCOMING_SMS)
                 continue;
             synthesizeMessage(message.phoneNumber, message.message, message.date);
         }

@@ -31,7 +31,7 @@ public class PackageChangeReceiver extends BroadcastReceiver {
 
         PackageInfo pkg;
         try {
-            pkg = pm.getPackageInfo(Helper.GOOGLE_VOICE_PACKAGE, 0);
+            pkg = pm.getPackageInfo(Helper.API_SMS_PACKAGE, 0);
         }
         catch (Exception e) {
             pkg = null;
