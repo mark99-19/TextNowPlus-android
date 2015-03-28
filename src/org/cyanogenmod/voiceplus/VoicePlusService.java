@@ -46,7 +46,7 @@ import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
@@ -356,21 +356,23 @@ public class VoicePlusService extends Service {
         bodyJson.addProperty("contact_value", destAddr);
         bodyJson.addProperty("message", text);
 
-        Map<String, List<String>> defaultQueryParams = new HashMap<String, List<String>>();
-        defaultQueryParams.put("client_id", Arrays.asList(clientId));
+        Map<String, List<String>> defaultQueryParams = new LinkedHashMap<String, List<String>>();
         defaultQueryParams.put("client_type", Arrays.asList("TN_ANDROID"));
+        defaultQueryParams.put("client_id", Arrays.asList(clientId));
 
         String signature = getMd5Signature(requestType, endpoint, getQueryString(defaultQueryParams), bodyJson.toString());
 
         JsonObject json = Ion.with(this)
-        .load(baseUrl + endpoint)
-        .addQueries(defaultQueryParams)
+        .load(requestType, baseUrl + endpoint)
+        .setLogging("VoicePlus", Log.DEBUG)
         .addQuery("signature", signature)
+        .addQuery("client_id", clientId)
+        .addQuery("client_type", "TN_ANDROID")
         .setJsonObjectBody(bodyJson)
         .asJsonObject()
         .get();
 
-        if (!json.get("ok").getAsBoolean())
+        if (!json.has("id"))
             throw new Exception(json.toString());
     }
 
@@ -383,6 +385,7 @@ public class VoicePlusService extends Service {
         @SerializedName("date")
         public String isoDate;
 
+        @SerializedName("dummy_timestamp")
         public long date;
 
         @SerializedName("contact_value")
@@ -469,14 +472,14 @@ public class VoicePlusService extends Service {
         String requestType = "GET";
         String endpoint = "users/" + username + "/messages";
 
-        Map<String, List<String>> defaultQueryParams = new HashMap<String, List<String>>();
+        Map<String, List<String>> defaultQueryParams = new LinkedHashMap<String, List<String>>();
         defaultQueryParams.put("client_id", Arrays.asList(clientId));
         defaultQueryParams.put("client_type", Arrays.asList("TN_ANDROID"));
 
-        Map<String, List<String>> extraQueryParams = new HashMap<String, List<String>>();
+        Map<String, List<String>> extraQueryParams = new LinkedHashMap<String, List<String>>();
         // TODO: Add extra query params
 
-        Map<String, List<String>> queryParams = new HashMap<String, List<String>>();
+        Map<String, List<String>> queryParams = new LinkedHashMap<String, List<String>>();
         queryParams.putAll(defaultQueryParams);
         queryParams.putAll(extraQueryParams);
 
@@ -487,7 +490,7 @@ public class VoicePlusService extends Service {
         JsonObject bodyJson = new JsonObject();
 
         Payload payload = Ion.with(this)
-        .load(baseUrl + endpoint)
+        .load(requestType, baseUrl + endpoint)
         .addQueries(queryParams)
         .addQuery("signature", getMd5Signature(requestType, endpoint, getQueryString(queryParams), bodyJson.toString()))
         .as(Payload.class)
