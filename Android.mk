@@ -2,7 +2,7 @@ LOCAL_PATH:= $(call my-dir)
 include $(CLEAR_VARS)
 
 LOCAL_STATIC_JAVA_LIBRARIES := ion AndroidAsync
-LOCAL_JAVA_LIBRARIES := telephony-common guava
+LOCAL_JAVA_LIBRARIES := telephony-common
 
 LOCAL_MODULE_TAGS := optional
 
