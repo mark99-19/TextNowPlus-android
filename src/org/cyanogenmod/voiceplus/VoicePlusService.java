@@ -499,6 +499,9 @@ public class VoicePlusService extends Service {
 
         Log.i(LOGTAG, "Refreshing messages");
 
+        // tokens!
+        final String authToken = getAuthToken(account);
+
         String requestType = "GET";
         String endpoint = "users/" + account + "/messages";
 
