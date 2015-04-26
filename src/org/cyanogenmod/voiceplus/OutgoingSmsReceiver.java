@@ -11,7 +11,7 @@ import android.content.Intent;
 public class OutgoingSmsReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
-        if (context.getSharedPreferences("settings", Context.MODE_PRIVATE).getString("client_id", null) == null)
+        if (context.getSharedPreferences("settings", Context.MODE_PRIVATE).getString("account", null) == null)
             return;
 
         abortBroadcast();

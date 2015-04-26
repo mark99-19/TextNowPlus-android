@@ -72,7 +72,6 @@ public class VoicePlusService extends Service {
     private SharedPreferences settings;
     private String hardcodedKey = "f8ab2ceca9163724b6d126aea9620339";
     private String baseUrl = "https://api.textnow.me/api2.0/";
-    private String username = "patcon_";
 
     @Override
     public IBinder onBind(Intent intent) {
@@ -247,7 +246,7 @@ public class VoicePlusService extends Service {
     public int onStartCommand(final Intent intent, int flags, int startId) {
         int ret = super.onStartCommand(intent, flags, startId);
 
-        if (null == settings.getString("client_id", null)) {
+        if (null == settings.getString("account", null)) {
             stopSelf();
             return ret;
         }
@@ -276,13 +275,15 @@ public class VoicePlusService extends Service {
             }.start();
         }
         else if (ACTION_INCOMING_API_SMS.equals(intent.getAction())) {
-            if (null == settings.getString("client_id", null))
+            if (null == settings.getString("account", null))
                 return ret;
             startRefresh();
         }
 
         return ret;
     }
+
+    public static final String ACCOUNT_CHANGED = VoicePlusService.class.getPackage().getName() + ".ACCOUNT_CHANGED";
 
     // mark all sent intents as failures
     public void fail(List<PendingIntent> sentIntents) {
@@ -323,9 +324,26 @@ public class VoicePlusService extends Service {
         recentSent.add(text);
     }
 
+    public String getAuthToken(String account) throws IOException, OperationCanceledException, AuthenticatorException {
+        Bundle bundle = AccountManager.get(this).getAuthToken(new Account(account, "com.textnow"), "default", true, null, null).getResult();
+        return bundle.getString(AccountManager.KEY_AUTHTOKEN);
+    }
+
     // send an outgoing sms event via google voice
     public void onSendMultipartText(String destAddr, String scAddr, List<String> texts, final List<PendingIntent> sentIntents, final List<PendingIntent> deliveryIntents, boolean multipart) {
-        String clientId = settings.getString("client_id", null);
+        // grab the account and wacko opaque routing token thing
+        String account = settings.getString("account", null);
+        String authToken;
+
+        try {
+            // grab the auth token
+            authToken = getAuthToken(account);
+        }
+        catch (Exception e) {
+            Log.e(LOGTAG, "Error fetching token", e);
+            fail(sentIntents);
+            return;
+        }
 
         // combine the multipart text into one string
         StringBuilder textBuilder = new StringBuilder();
@@ -337,7 +355,18 @@ public class VoicePlusService extends Service {
         try {
             // send it off, and note that we recently sent this message
             // for round trip tracking
-            sendApiSms(clientId, destAddr, text);
+            sendApiSms(authToken, destAddr, text);
+            addRecent(text);
+            success(sentIntents);
+            return;
+        }
+        catch (Exception e) {
+            Log.d(LOGTAG, "send error", e);
+        }
+
+        try {
+            // on failure, fetch info and try again
+            sendApiSms(authToken, destAddr, text);
             addRecent(text);
             success(sentIntents);
         }
@@ -348,9 +377,11 @@ public class VoicePlusService extends Service {
     }
 
     // hit the google voice api to send a text
-    void sendApiSms(final String clientId, String destAddr, String text) throws Exception {
+    void sendApiSms(final String authToken, String destAddr, String text) throws Exception {
+        String account = settings.getString("account", null);
+
         String requestType = "POST";
-        String endpoint = "users/" + username + "/messages";
+        String endpoint = "users/" + account + "/messages";
 
         JsonObject bodyJson = new JsonObject();
         bodyJson.addProperty("contact_value", destAddr);
@@ -358,7 +389,7 @@ public class VoicePlusService extends Service {
 
         Map<String, List<String>> defaultQueryParams = new LinkedHashMap<String, List<String>>();
         defaultQueryParams.put("client_type", Arrays.asList("TN_ANDROID"));
-        defaultQueryParams.put("client_id", Arrays.asList(clientId));
+        defaultQueryParams.put("client_id", Arrays.asList(authToken));
 
         String signature = getMd5Signature(requestType, endpoint, getQueryString(defaultQueryParams), bodyJson.toString());
 
@@ -462,17 +493,17 @@ public class VoicePlusService extends Service {
 
     // refresh the messages that were on the server
     void refreshMessages() throws Exception {
-        String clientId = settings.getString("client_id", null);
-        if (clientId == null)
+        String account = settings.getString("account", null);
+        if (account == null)
             return;
 
         Log.i(LOGTAG, "Refreshing messages");
 
         String requestType = "GET";
-        String endpoint = "users/" + username + "/messages";
+        String endpoint = "users/" + account + "/messages";
 
         Map<String, List<String>> defaultQueryParams = new LinkedHashMap<String, List<String>>();
-        defaultQueryParams.put("client_id", Arrays.asList(clientId));
+        defaultQueryParams.put("client_id", Arrays.asList(authToken));
         defaultQueryParams.put("client_type", Arrays.asList("TN_ANDROID"));
 
         Map<String, List<String>> extraQueryParams = new LinkedHashMap<String, List<String>>();
