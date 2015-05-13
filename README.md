@@ -1,8 +1,7 @@
 # TextNowPlus
 
 **Disclaimer: This is a fan project, and not affiliated with or endorsed
-by TextNow. Although I am currently in the process of trying to become
-an employee... eep? :sweat:**
+by TextNow.**
 
 TextNowPlus is a fork of VoicePlus.
 
